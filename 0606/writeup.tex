@@ -1,0 +1,147 @@
+\NeedsTeXFormat{LaTeX2e}
+\documentclass[11pt]{article}
+\usepackage{url}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{mathpartir}
+\usepackage{graphicx}
+\usepackage{comment}
+\usepackage{caption}
+\usepackage{subcaption}
+
+
+\input{macro}
+
+\title{Multi-party DP Write-up 1\\
+Linear Least Squares}
+\date{}
+\begin{document}
+\maketitle
+
+{\bf Notations.}
+
+Let $D={\bf [X, y]}$ be a database of size $n$, with ${\bf X} \in \mathbb{R}^{n \times d}$ and ${\bf y} \in \mathbb{R}$. $[n]$ stands for the set $\{1, \dots, n\}$. We use $z \sim N(\mu, \sigma)$ to denote a variable following the Gaussian distribution with mean $\mu$ and standard deviation $\sigma$.
+
+{\bf Linear Least Squares .}
+
+In a linear regression model the response variable is a linear function of the regressors:
+\begin{equation}
+{\bf y = X\theta + \epsilon}
+\end{equation}
+where $\bf \epsilon$ denote the error terms. 
+
+The loss function under linear least squares model is defined as 
+\begin{equation}
+L(\theta; D) = \Sigma_{i \in [n]} (\bf {\theta \cdot x_{i}}  - y_{i})^{2}
+\end{equation}
+where $\cdot$ is the inner product of two vectors.
+
+Linear least squares model has a nice closed form expression for $\theta$, such that its loss function $L(\theta;D)$ is minimized.
+\begin{equation}
+{\bf \theta = (X^{\top} X)^{-1} X^{\top} y }
+\end{equation}
+
+{\bf Distributed Computing Problem}
+
+Let $A_{1}, \dots A_{t}$ and $B$ be $t+1$ parties (agents with computing power). Each $A_{i}$ owns some of the data $\{D_{j}\}_{j \in S_{i}}$, where $S_{i} \subseteq [n]$. For simplicity, we assume $\{S_{1}, \dots , S_{t}\}$ partition $[n]$. The task for them is to jointly compute $\theta$ under the linear least squares model, such that the entire computation is differential-private (both intermediate output and final output should be differential private).
+
+{\bf Privacy $\&$ Utility}
+
+There is a trade-off between privacy and utility in any mechanism. 
+\begin{enumerate}
+\item We use $(\epsilon, \delta)$-differential privacy to evaluate the privacy level of our algorithm.
+\item We use the concept of worst case (over input data) {\it expected excess risk} to evaluate the utility of our algorithm. 
+\begin{definition}
+Given loss function $L(\theta; D)$ over database $D$, its worst case {\it expected excess risk} is defined as
+\begin{equation}
+E[L(\theta; D) - L(\theta^{*}; D)]
+\end{equation}
+where $\theta$ is the output of the algorithm, $\theta^{*}$ is the optimal minimizer of the loss function and the randomness comes from the algorithm.
+\end{definition}
+\end{enumerate}
+
+{\bf Naive Algorithm. }
+
+\begin{enumerate}
+\item Each $A_{i}$ computes  $\bf {(C_{i}, d_{i})}$=($\Sigma_{j \in S_{i}} {\bf x_{j} x_{j}^{\top}}+ z_{1}^{(d\times d)}$ , $\Sigma_{j \in S_{i}} {\bf x_{j}} y_{j} + z_{2}^{(d)}$) and transfer it to party $B$, where $z_{1} \sim N(0, \sigma_{1})$ and $z_{2} \sim N(0, \sigma_{2})$.
+\item Agent $B$ computes $(\Sigma_{i \in [t]} {\bf C_{i}})^{-1} (\Sigma_{i \in [t]} {\bf d_{i}}) $ and output it as the solution $\bf \theta$.
+\end{enumerate}
+
+{\bf Analysis of the Naive Algorithm with $d=1$}
+
+\begin{definition}
+The sensitivity of function $f$ is defined as $\Delta(f) = sup_{(D,D')}(|f(D)-f(D')|_{2})$, where $(D,D')$ is a pair of neighboring databases.
+\end{definition}
+
+\begin{theorem}[ DP with Gaussian noise]
+Let $f$ be the target function, and $z \sim N(0, \sigma)$. Let $F(D)= f(D) + z$ be the output function. Fix any $\delta >0$, we have $F$ is $(\epsilon, \delta)$-DP, where $\epsilon = \frac{\Delta(f) \sqrt{2\ln (2/\delta)}}{\sigma}$.
+\end{theorem}
+
+
+{\bf Privacy Analysis}
+
+Let $c(D) = \Sigma_{j \in [n]} { x_{j}^{2} }$ and $d(D)= \Sigma_{j \in [n]} { x_{j}} y_{j} $.
+\begin{enumerate}
+\item Each $A_{i}$'s algorithm is $(\epsilon_{1}+\epsilon_{2}, \delta_{1}+\delta_{2})$-DP, where $\epsilon_{1} = \frac{\Delta(c) \sqrt{2\ln (2/\delta_{1})}}{\sigma_{1}}$ and $\epsilon_{2} = \frac{\Delta(d) \sqrt{2\ln (2/\delta_{2})}}{\sigma_{2}}$.
+
+When $d=1$, each $A_{i}$ computes and outputs ${(c_{i}, d_{i})}$=($\Sigma_{j \in S_{i}} { x_{j}^{2} }+ z_{1}$, $\Sigma_{j \in S_{i}} { x_{j}} y_{j} + z_{2}$), where $z_{1} \sim N(0, \sigma_{1})$ and $z_{2} \sim N(0, \sigma_{2})$. It is obvious that $\Delta(c_{i})= \Delta(c)$ and $\Delta(d_{i})= \Delta(d)$ for all $i \in [t]$.
+
+Fix $\delta_{1} >0$, $c_{i}$ is $(\epsilon_{1}, \delta_{1})$-DP, where $\epsilon_{1} = \frac{\Delta(c) \sqrt{2\ln (2/\delta_{1})}}{\sigma_{1}}$. Similarly, $d_{i}$ is $(\epsilon_{2}, \delta_{2})$-DP, where $\epsilon_{2} = \frac{\Delta(d) \sqrt{2\ln (2/\delta_{2})}}{\sigma_{2}}$. By the composition theorem of differential privacy, each $A_{i}$'s algorithm is $(\epsilon_{1}+\epsilon_{2}, \delta_{1}+\delta_{2})$-DP.
+\item $B$'s algorithm.  
+
+It is easy to see $B$'s output is
+\begin{equation}
+\theta = \frac{\Sigma_{i\in [n]} x_{i}y_{i} + tz_{2}}{\Sigma_{i\in [n]} x_{i}^{2} + tz_{1}} .
+\end{equation}
+\begin{equation}
+=  \frac{d(D) }{c(D) + tz_{1}} +  \frac{tz_{2}}{c(D) + tz_{1}} .
+\end{equation}
+We only consider the case when $(X^{\top} X)$ is invertible. Here, we assume WLOG that $c(D) =\Sigma_{i\in [n]} x_{i}^{2}  \geq b_{l} > 0 $. We treat $ \frac{d(D) }{c(D) + tz_{1}}$ as our target function and $ \frac{tz_{2}}{c(D) + tz_{1}}$ as the noise.
+
+Pick $b_{z}$ such that $0<b_{z}<b_{l}$, let $1-\delta_{z}$ be the probability that $tz_{1} \in [-b_{z}, b_{z}]$. Then, with probability $1-\delta_{z}$, $c(D) + tz_{1} \geq b_{l} -b_{z}$, and therefore $\Delta(\frac{d(D) }{c(D) + tz_{1}}) \leq \Delta(d)/(b_{l}-b_{z})$. 
+
+We need to separate the discussion on the upper bound of $c(D)$.
+\begin{enumerate}
+\item If $c(D)$ does not have an upper bound, $ \frac{tz_{2}}{c(D) + tz_{1}}$ could be $0$ and $B$'s algorithm does not have privacy guarantee. We need to modify $B$'s algorithm by adding $z_{3} \sim N(0, \sigma_{3})$ to $\theta$.
+\item If $c(D) \leq b_{u}$. Then, with probability $1-\delta_{z}$, $c(D) + tz_{1} \leq b_{u} + b_{z}$ and therefore $ \frac{tz_{2}}{c(D) + tz_{1}} \geq \frac{tz_{2}}{b_{u} + b_{z}}$. It is obvious that $\frac{tz_{2}}{b_{u} + b_{z}} \sim N(0, \frac{t}{b_{u} + b_{z}} \sigma_{2})$. 
+
+Fix $\delta_{3}>0$, we have $B$'s algorithm is $(\epsilon_{3}, \delta_{z}+\delta_{3})$-DP, where $\epsilon_{3} \leq  \frac{ (\Delta(d)/(b_{l}-b_{z})) \sqrt{2 \ln (2 / \delta_{3})} }{\frac{t}{b_{u} + b_{z}} \sigma_{2}} = \frac{\Delta(d)(b_{u} + b_{z}) \sqrt{2 \ln (2 / \delta_{3})}}{(b_{l}-b_{z})t \sigma_{2}}$
+ \end{enumerate}
+\end{enumerate}
+
+{\bf Utility Analysis}
+
+We calculate $E[L(\theta; D) - L(\theta^{*}; D)]$, where $\theta^{*}$ is the optimal minimizer to the loss function. In the following discussion, we assume $c(D)=\Sigma_{i\in [n]} x_{i}^{2}$ has some upper bound ($c(D) \leq b_{u}$), and therefore $B$'s algorithm has certain level of privacy guarantee. In the case when $c(D)$ does not have an upper bound, it is easy to see that adding another $z_{3} \sim N(0, \sigma_{3})$ to $\theta$ will bring extra $\sigma_{3}^{2}c(D)$ to the expected excess risk.
+
+It is known that $\theta^{*} = \frac{d(D)}{c(D)}$ under the linear least model. 
+\begin{equation}
+E[L(\theta; D) - L(\theta^{*}; D)] = E[\Sigma_{i \in [n]} (\frac{d(D) +tz_{2}}{c(D)+tz_{1}}x_{i} - y_{i})^{2} -  (\frac{d(D) }{c(D)}x_{i} - y_{i})^{2}] 
+\end{equation}
+We focus on its $i$-th term. 
+\begin{equation}
+E[(\frac{d(D) +tz_{2}}{c(D)+tz_{1}}x_{i} - y_{i})^{2} -  (\frac{d(D) }{c(D)}x_{i} - y_{i})^{2}]
+\end{equation}
+\begin{equation}
+=E [(\frac{(d(D) +tz_{2})^{2}}{(c(D)+tz_{1})^{2}}x_{i}^{2} + y_{i}^{2} -2\frac{d(D) +tz_{2}}{c(D)+tz_{1}}x_{i}y_{i}] - (\frac{d(D)^{2} }{c(D)^{2}}x_{i}^{2}+y_{i}^{2} - 2\frac{d(D) }{c(D)}x_{i}y_{i})
+\end{equation}
+\begin{equation}
+=E[\frac{(d(D) +tz_{2})^{2}}{(c(D)+tz_{1})^{2}}x_{i}^{2}] - \frac{d(D)^{2} }{c(D)^{2}}x_{i}^{2}
+\end{equation}
+\begin{equation}
+=E[\frac{(d(D)^{2} +t^{2}z_{2}^{2}+2d(D)tz_{2})}{(c(D)^{2} +t^{2}z_{1}^{2}+2c(D)tz_{1})}x_{i}^{2}]- \frac{d(D)^{2} }{c(D)^{2}}x_{i}^{2}
+\end{equation}
+\begin{equation}
+=(\frac{d(D)^{2} +t^{2}\sigma_{2}^{2}}{c(D)^{2} +t^{2}\sigma_{1}^{2}}- \frac{d(D)^{2} }{c(D)^{2}})x_{i}^{2}
+\end{equation}
+Hence, we have $E[L(\theta; D) - L(\theta^{*}; D)] = (\frac{d(D)^{2} +t^{2}\sigma_{2}^{2}}{c(D)^{2} +t^{2}\sigma_{1}^{2}}- \frac{d(D)^{2} }{c(D)^{2}}) c(D)$.
+
+
+{\bf Algorithm based on Stochastic gradient descent}
+\begin{enumerate}
+\item $B$ chooses $\theta_{0} $ from the convex set $\cal C$, learning rate $\eta$ and a permutation $\pi$ over n copies of $[n]$. $B$ broadcasts $(\theta_{0}, \eta, \pi)$
+\item In each iteration $i$, the agent $A_{j}$ that owns data $D_{\pi(i)}$ will compute $\theta_{i+1} =\Pi_{\cal C}[ \theta_{i} - \eta(i) (n \Delta(l(\theta_{i};D_{\pi(i)})) + z_{i})]$, where $z_{i} $ is a zero mean Gaussian noise and $\Pi_{\cal C}$ is a projection function to set $\cal C$. $A_{j}$ broadcasts $G_{i}=n \Delta(l(\theta_{i};D_{\pi(i)}))$.
+\item Each of the remaining $A_{k}$ will update $\theta_{i+1} =\Pi_{\cal C}[ \theta_{i} - \eta(i) G_{i}] $
+\end{enumerate}
+
+\end{document}

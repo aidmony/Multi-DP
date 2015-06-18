@@ -1,0 +1,117 @@
+\NeedsTeXFormat{LaTeX2e}
+\documentclass[11pt]{article}
+\usepackage{url}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{mathpartir}
+\usepackage{graphicx}
+\usepackage{comment}
+\usepackage{caption}
+\usepackage{subcaption}
+
+
+\input{macro}
+
+\title{Multi-party DP Write-up 2\\
+Stochastic Gradient Descent}
+\date{}
+\begin{document}
+\maketitle
+
+\section{Notations and Settings}
+Let $D={\bf [X, y]}$ be a database of size $n$, with ${\bf X} \in \mathbb{R}^{n \times p}$ and ${\bf y} \in \mathbb{R}$. $[n]$ stands for the set $\{1, \dots, n\}$. We use $z \sim N(\mu, \sigma)$ to denote a variable following the Gaussian distribution with mean $\mu$ and variance $\sigma^{2}$. 
+
+\begin{definition}[ERM]
+Given a data set $D = \{d_{1}, \dots , d_{n} \}$ drawn from a universe ${\cal X} \subseteq \mathbb{R}^{n \times (p+1)} $ , and a closed, convex set $\cal C$, the goal of Empirical Risk Minimization (ERM) is 
+\begin{equation}
+\min_{\theta \in {\cal C}} L(\theta; D) = \Sigma_{i=1}^{n} l(\theta; d_{i})	
+\end{equation}
+The function $l$ defines, for each data point $d$, a loss function $l(.; d)$ on $\cal C$. We will generally assume that $l(·; d)$ is convex and L-Lipschitz for all $d \in {\cal X}$.
+\end{definition}
+
+\begin{definition}[Lipschitz Function]
+$l : {\cal C} \rightarrow \mathbb{R}$ is L-Lipschitz (in the Euclidean norm) if, for all pairs $x, y \in {\cal C}$, we have $|l(x)-l(y)| \leq L|x-y|_{2}$.
+\end{definition}
+
+\begin{definition}[Distributed Private ERM]
+Let $A_{1}, \dots A_{t}$ and $B$ be $t+1$ parties. Each $A_{i}$ owns some of the data $\{d_{j}\}_{j \in S_{i}}$, where $S_{i} \subseteq [n]$ and $|S_{i}| = n_{i}$. For simplicity, we assume $\{S_{1}, \dots , S_{t}\}$ partition $[n]$. \\
+Our goal is to find an algorithm that makes $\{A_{1}, \dots A_{t}, B\}$ distributively compute $\theta$ under ERM model. such that the entire computation, including all the intermediate outputs and final output, is $(\epsilon, \delta)$-differential private.
+\end{definition}
+
+
+{\bf Privacy $\&$ Utility.} There is always a trade-off between privacy and utility. We use the concept of worst case (over input data) {\it expected excess risk} to evaluate the utility of our algorithm.
+ 
+\begin{definition}
+Given loss function $L(\theta; D)$ over database $D$, its worst case {\it expected excess risk} is defined as
+\begin{equation}
+E[L(\theta; D) - L(\theta^{*}; D)]
+\end{equation}
+where $\theta$ is the output of the algorithm, $\theta^{*}$ is the optimal minimizer of the loss function and the randomness comes from the algorithm.
+\end{definition}
+
+\section{Stochastic Gradient Descent}
+We propose two distributed algorithms, both of which are based on the stochastic gradient descent algorithm in [1].
+
+{\bf Algorithm SGD1}.
+\begin{enumerate}
+\item $B$ uniformly chooses the initial assignment $\theta_{0} \in {\cal C}$ , learning rate function $\eta: [n^{2}] \rightarrow \mathbb{R}$, a noise variance $\sigma^{2} >0$, and a sequence of ${\pi}=[\pi_{1}, \dots \pi_{n^{2}}]$ with each $\pi_{j}$ uniformly chosen from $[n]$. $B$ broadcasts $(\theta_{0}, \eta, \sigma^{2})$.
+\item In each iteration $i=1$ to $n^{2}$, $B$ gives a computing permission to agent $A_{j}$ who owns data $d_{\pi(i)}$.
+\item Upon receiving permission, $A_{j}$ will compute $\theta_{i+1} =\Pi_{\cal C}(\theta_{i} - \eta(i) G_{i})$, where $G_{i} = n \Delta(l(\theta_{i};d_{\pi(i)})) + z_{i}$ with $z_{i} \sim N(0, \sigma^{2})^{p}$ , and $\Pi_{\cal C}$ is the projection function onto set $\cal C$. $A_{j}$ sends $G_{i}$ to $B$.
+\item $B$ broadcast $G_{i}$ together with a update permission to all other $A_{k}$, where $k \neq j$.
+\item Each of the remaining $A_{k}$ will update $\theta_{i+1} =\Pi_{\cal C}[ \theta_{i} - \eta(i) G_{i}] $
+\item After $n^{2}$ iterations, $B$ returns $\theta = \theta_{n^{2}}$ as the final output.
+\end{enumerate}
+For $0< \epsilon <1$ and $0<\delta < 1/n$, we set parameters in Algorithm SGD1 as the follows
+\begin{equation}
+\sigma^{2} = O (\frac{L^{2} n^{2} \log (n/\delta) \log (1/\delta)}{\epsilon^{2}})
+\end{equation}
+\begin{equation}
+\eta(t) = \frac{|{\cal C}|_{2}}{\sqrt{t(n^{2}L^{2} + p \sigma^{2})}}
+\end{equation}
+
+\begin{theorem}
+Algorithm SGD1 is $(\epsilon, 1-(1-\delta/2)^{n^{2}})(1-\delta^{1/3}))$-Private. In particular, Algorithm SGD1 is $(\epsilon, n^{2}\delta/2)$ when $\delta = \omega(1/n^{3})$,
+\end{theorem}
+{\bf Proof. } The entire output of Algorithm SGD1 consists of $\{ G_{1}, \dots, G_{n^{2}}\}$. We show adaptively outputting $n^{2}$ such $G_{i}$ is $(\epsilon, (n^{2}+1)\delta)$-Private.
+
+Let $G_{i}(D) = n \Delta(l(\theta_{i};d_{\pi(i)})) + z_{i}$ be a random variable defined over the randomness of $\pi$, $z_{i}$ and conditioned on $\theta_{i}$. Fixing the randomness of $\pi$, it can be shown according to standard Gaussian Differential Privacy analysis that each $G_{i}$ is $(\frac{\epsilon}{2\sqrt{\log(1/\delta)}}, \delta/2)$-DP [1]. (We just need to show with probability at least $1-\delta/2$, $|\log (\frac{G_{i}(D)}{G_{i}(D')})| \leq \frac{\epsilon}{2\sqrt{\log(1/\delta)}}$, where $D$, $D'$ are a pair of neighboring databases)
+
+It is obvious that $\pi$ provides the same randomness as the uniform sampling from $D$. By the privacy amplification lemma in [1], each $G_{i}$ is $(\frac{\epsilon}{n\sqrt{\log(1/\delta)}}, \delta/2)$-DP. We apply the strong composition theorem lemma [2] with $k=n^{2}$, $\delta' = \delta^{1/3}$. We have
+\begin{equation}
+n^{2}\epsilon^{2} + \epsilon \sqrt{2 n^{2} \log(1/\delta')} = \epsilon (\frac{\epsilon}{\log(1/\delta)} + \sqrt{2/3}) \leq \epsilon
+\end{equation}
+
+
+\begin{lemma} [Strong Composition Theorem]
+For any $1>\epsilon > 0$, $\delta \in [0,1]$ and $\delta' \in [0,1]$ the class of $(\epsilon, \delta)$-differentially private mechanisms satisfies $(\epsilon', 1-(1-\delta)^{k})(1-\delta')$-DP under $k$-fold adaptive composition for
+\begin{equation}
+\epsilon' = \min \{ k\epsilon, k\epsilon^{2} + \epsilon \sqrt{2k \log(1/\delta')} \}
+\end{equation}
+\end{lemma}
+
+{\bf Algorithm SGD2}.
+\begin{enumerate}
+\item $B$ uniformly chooses the initial assignment $\theta_{0} \in {\cal C}$ , learning rate function $\eta: [n^{2}] \rightarrow \mathbb{R}$, a noise variance $\sigma^{2} >0$, and a sequence of ${\pi}=[\pi_{1}, \dots \pi_{t}]$ with each $\pi_{j}$ uniformly chosen from $[t]$. $B$ broadcasts $(\theta_{0}, \eta, \sigma^{2})$.
+\item In each iteration $i=1$ to $t$, $B$ gives a computing permission to agent $A_{\pi_{i}}$.
+\item Upon receiving permission, for $j=1$ to $n_{\pi_{i}}$, $A_{\pi_{i}}$ uniformly pick $d_{j}$ from his dataset $S_{\pi_{i}}$.
+Then, $A_{\pi_{i}}$ will compute $\theta_{j+1} =\Pi_{\cal C}(\theta_{j} - \eta(j) G_{j})$, where $G_{j} = n \Delta(l(\theta_{j};d_{j})) + z_{j}$ with $z_{j} \sim N(0, \sigma^{2})^{p}$ , and $\Pi_{\cal C}$ is the projection function onto set $\cal C$. $A_{\pi_{i}}$ sends $\{G_{j}\}_{j\in [n_{\pi_{i}}]}$ to $B$.
+\item $B$ broadcast $\{G_{j}\}_{j\in [n_{\pi_{i}}]}$ together with a update permission to all other $A_{k}$, where $k \neq j$.
+\item Each of the remaining $A_{k}$ will update $n_{\pi_{i}}$ steps by $\theta_{j+1} =\Pi_{\cal C}[ \theta_{j} - \eta(j) G_{j}] $
+\item After $n^{2}$ iterations, $B$ returns $\theta = \theta_{n^{2}}$ as the final output.
+\end{enumerate}
+
+
+\begin{theorem}
+Algorithm SGD2 is 
+\end{theorem}
+
+
+\section{References}
+\begin{enumerate}
+\item http://www.cse.psu.edu/~ads22/pubs/BST14/2014-04-10-BST14-convex-opt.pdf 
+\item http://arxiv.org/pdf/1311.0776v2.pdf
+\end{enumerate}
+
+
+\end{document}
